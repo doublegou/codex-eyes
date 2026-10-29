@@ -1,0 +1,30 @@
+name: Build and test
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select a Liquid Glass SDK
+        shell: bash
+        run: |
+          for app in /Applications/Xcode*.app; do
+            sdk="$(DEVELOPER_DIR="$app/Contents/Developer" xcrun --sdk macosx --show-sdk-path 2>/dev/null || true)"
+            if [[ -f "$sdk/System/Library/Frameworks/AppKit.framework/Headers/NSGlassEffectView.h" ]]; then
+              echo "DEVELOPER_DIR=$app/Contents/Developer" >> "$GITHUB_ENV"
+              exit 0
+            fi
+          done
+          echo "Xcode 26+ with the Liquid Glass SDK is required." >&2
+          exit 1
+      - run: bash scripts/test.sh
+      - run: bash scripts/package.sh universal
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CodexEyes-local-build
+          path: |
+            dist/*-preview.zip
+            dist/*-preview.dmg
+            dist/*-preview.sha256
