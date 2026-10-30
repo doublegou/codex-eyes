@@ -13,6 +13,7 @@ let package = Package(
         .target(name: "CodexEyesCore", resources: [.process("Resources")]),
         .executableTarget(name: "CodexEyes", dependencies: ["CodexEyesCore"]),
         .executableTarget(name: "CodexEyesHook", dependencies: ["CodexEyesCore"]),
-        .testTarget(name: "CodexEyesCoreTests", dependencies: ["CodexEyesCore"])
+        .testTarget(name: "CodexEyesCoreTests", dependencies: ["CodexEyesCore"]),
+        .testTarget(name: "CodexEyesUITests", dependencies: ["CodexEyes"])
     ]
 )

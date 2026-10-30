@@ -4,7 +4,7 @@ import CodexEyesCore
 
 /// Native menu tracking and selection, with availability icons and a trailing login mark.
 @MainActor struct LoginAccountMenu: NSViewRepresentable {
-    var model: AppModel
+    @ObservedObject var model: AppModel
 
     func makeCoordinator() -> Coordinator { Coordinator(model: model) }
     func makeNSView(context: Context) -> SettingsPopUpButton {
