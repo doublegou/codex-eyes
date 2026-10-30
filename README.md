@@ -20,8 +20,6 @@
   <img src="docs/preview-dark.png" width="280" alt="Codex Eyes 深色外观">
 </p>
 
-<p align="center"><sub>浅色与深色外观 · 预览使用示例账号与数据</sub></p>
-
 ## 功能
 
 - **剩余额度** — 查看 5 小时与每周额度、重置时间，菜单栏圆环显示当前登录账号的剩余比例。
@@ -76,5 +74,3 @@
 ## 许可与致谢
 
 源码采用 [MIT 许可证](LICENSE)。账号辅助程序使用 [codex-auth](https://github.com/Loongphy/codex-auth)，依赖许可见[第三方声明](ThirdParty/NOTICE.md)；图标声明见 [Assets/NOTICE.md](Assets/NOTICE.md)。
-
-Codex Eyes 是独立项目，与 OpenAI 无隶属关系。

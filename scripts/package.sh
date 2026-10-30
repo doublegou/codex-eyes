@@ -2,14 +2,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 architecture="${1:-$(uname -m)}"
-mode="${2:-preview}"
+mode="${2:-package}"
 case "$architecture" in arm64|x86_64|universal) ;; *) echo "Usage: package.sh [arm64|x86_64|universal] [--release]" >&2; exit 1 ;; esac
-case "$mode" in preview|--release) ;; *) echo "Unknown package mode: $mode" >&2; exit 1 ;; esac
+case "$mode" in package|--release) ;; *) echo "Unknown package mode: $mode" >&2; exit 1 ;; esac
 identity="${CODEX_EYES_SIGN_IDENTITY:--}"
 if [[ "$mode" == "--release" ]]; then
     if [[ "$identity" != "Developer ID Application:"* || -z "${CODEX_EYES_NOTARY_PROFILE:-}" ]]; then
-        echo "Public release needs CODEX_EYES_SIGN_IDENTITY='Developer ID Application: …' and CODEX_EYES_NOTARY_PROFILE." >&2
-        echo "Apple Development and ad-hoc signatures do not qualify. Run without --release for a local preview." >&2
+        echo "Notarized packaging needs CODEX_EYES_SIGN_IDENTITY='Developer ID Application: …' and CODEX_EYES_NOTARY_PROFILE." >&2
+        echo "Run without --release to package with the configured signing identity." >&2
         exit 1
     fi
 fi
@@ -70,9 +70,7 @@ else
 fi
 codesign --verify --deep --strict "$app"
 python3 scripts/test-account-import.py "$app/Contents/Helpers/codex-auth"
-suffix="-preview"
-if [[ "$mode" == "--release" ]]; then suffix=""; fi
-artifact="dist/CodexEyes-1.0.0-$architecture$suffix"
+artifact="dist/CodexEyes-1.0.0-$architecture"
 if [[ "$mode" == "--release" ]]; then
     ditto -c -k --sequesterRsrc --keepParent "$app" "$stage/notarization.zip"
     xcrun notarytool submit "$stage/notarization.zip" --keychain-profile "$CODEX_EYES_NOTARY_PROFILE" --wait
@@ -99,5 +97,5 @@ mv "$app" "dist/Codex Eyes.app"
 echo "Built dist/Codex Eyes.app ($architecture). Signing identity: $identity"
 echo "Installer: $artifact.dmg"
 if [[ "$mode" != "--release" ]]; then
-    echo "LOCAL PREVIEW: not a notarized public release. See docs/releasing.md."
+    echo "Apple notarization was not requested. See docs/releasing.md for signing options."
 fi

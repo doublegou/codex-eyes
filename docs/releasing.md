@@ -5,7 +5,7 @@ Codex Eyes 是原生菜单栏应用，交付物包含完整 `.app`，不是网�
 不要求用户安装 Node.js、Python 或 Xcode。菜单栏仍显示当前账号额度，应用图标独立使用 `Assets/AppIcon.png`。
 首次启动自动展开看板，后续可从菜单栏圆环或快捷键打开。
 
-## 当前可生成的预览包
+## 生成安装包
 
 ```sh
 bash scripts/test.sh
@@ -13,11 +13,10 @@ bash scripts/package.sh universal
 ```
 
 - `dist/Codex Eyes.app`：完整应用。
-- `dist/CodexEyes-1.0.0-universal-preview.dmg`：拖入“应用程序”的安装磁盘映像。
+- `dist/CodexEyes-1.0.0-universal.dmg`：拖入“应用程序”的安装磁盘映像。
 - 同名 ZIP 与 SHA-256 文件：备选下载格式与校验值。
-- `preview` 表示未完成公开发行签名和公证，不是应用内模拟数据模式；正常运行仍读取用户自己的本机数据。
 
-此包可以本机测试，但不能称为已经通过 Apple Gatekeeper 的正式发行版。
+默认使用本地签名，未经过 Apple 公证。版本名称与签名状态独立。
 不建议让用户关闭 Gatekeeper 或移除隔离属性作为安装流程。
 
 ## 公开发行前
