@@ -13,6 +13,7 @@ import CodexEyesCore
     let model: AppModel
     private var statusItem: NSStatusItem!
     private var panel: EyesPanel!
+    private var panelPresentation: PanelPresentation!
     private var settings: NSWindow?
     private var usageDetails: NSWindow?
     private var switchingLogin = false
@@ -52,6 +53,7 @@ import CodexEyesCore
         panel.isMovableByWindowBackground = true; panel.delegate = self
         panel.acceptsMouseMovedEvents = true
         panel.becomesKeyOnlyIfNeeded = false
+        panelPresentation = PanelPresentation(panel: panel, button: statusItem.button!)
         model.onPanelHeight = { [weak self] height in
             Task { @MainActor in self?.fitPanel(height: height) }
         }
@@ -82,7 +84,11 @@ import CodexEyesCore
             }
         ]
         outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            Task { @MainActor in if let self, !self.model.pinned, self.panel.attachedSheet == nil { self.hide() } }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if self.panelPresentation.shouldDismiss(at: NSEvent.mouseLocation, pinned: self.model.pinned,
+                                                        trackingMenu: self.menuTrackingDepth > 0) { self.hide() }
+            }
         }
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
             guard let self else { return event }
@@ -90,7 +96,8 @@ import CodexEyesCore
             // Native menu clicks are not clicks outside the dashboard.
             if event.type != .keyDown, event.window == nil || event.window?.level == .popUpMenu { return event }
             if event.type == .keyDown && event.keyCode == 53 && event.window == self.panel { self.hide(); return nil }
-            if event.type != .keyDown, event.window != self.panel, event.window != self.statusItem.button?.window, !self.model.pinned { self.hide() }
+            if event.type != .keyDown, event.window != self.panel, event.window != self.statusItem.button?.window,
+               self.panelPresentation.shouldDismiss(at: NSEvent.mouseLocation, pinned: self.model.pinned, trackingMenu: false) { self.hide() }
             return event
         }
         model.onShortcutChange = { [weak self] shortcut in self?.registerHotKey(shortcut) }
@@ -126,9 +133,9 @@ import CodexEyesCore
         panel.setFrameOrigin(NSPoint(x: x, y: max(frame.minY + 8, frame.maxY - panel.frame.height + PanelLayout.bleed - 5)))
         model.opened(); panel.invalidateShadow()
         NSApp.activate(ignoringOtherApps: true)
-        panel.makeKeyAndOrderFront(nil)
+        panelPresentation.show()
     }
-    func hide() { panel.orderOut(nil); model.panelVisible = false }
+    func hide() { panelPresentation.hide(); model.panelVisible = false }
     func fitPanel(height: CGFloat) {
         guard let panel, height.isFinite else { return }
         let height = max(250, ceil(height)) + PanelLayout.bleed * 2

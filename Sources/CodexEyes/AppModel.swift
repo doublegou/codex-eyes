@@ -47,12 +47,16 @@ import CodexEyesCore
     private var resetTimer: Timer?
     private var resetChecks: Set<String> = []
     private var watcher: FileWatch?
+    private var networkWatch: NetworkWatch?
+    private var networkRefreshPending = false
     private var scanTask: Task<Void, Never>?
     private var wakeObserver: NSObjectProtocol?
     private var notificationKeys: [String: Double] = [:]
     private var previousAvailability: [String: Availability] = [:]
     private var previousTaskStatus: [String: SessionStatus] = [:]
     private var synchronizedLoginStamp: String?
+    private var quotaRetryTask: Task<Void, Never>?
+    private var quotaFailures = 0
 
     init(demo: Bool = false, previewLanguage: AppLanguage? = nil) {
         var loaded = (UserDefaults.standard.data(forKey: "preferences.v1").flatMap { try? JSONDecoder().decode(Preferences.self, from: $0) }) ?? Preferences()
@@ -108,6 +112,10 @@ import CodexEyesCore
         resetTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.checkResets()
+                if let self, self.networkRefreshPending, !self.busy {
+                    self.networkRefreshPending = false
+                    await self.refresh()
+                }
                 await self?.syncConfiguredLoginIfChanged()
             }
         }
@@ -117,10 +125,15 @@ import CodexEyesCore
         watcher = FileWatch(paths: [EyesPaths.codexHome.path, EyesPaths.support.path]) { [weak self] in
             Task { @MainActor in self?.scheduleScan() }
         }
+        networkWatch = NetworkWatch { [weak self] in
+            MainActor.assumeIsolated { self?.networkRefreshPending = true }
+        }
     }
     private func stop() {
+        quotaRetryTask?.cancel(); quotaRetryTask = nil; quotaFailures = 0
         timer?.invalidate(); timer = nil; resetTimer?.invalidate(); resetTimer = nil
         watcher = nil; scanTask?.cancel()
+        networkWatch = nil; networkRefreshPending = false
         if let observer = wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(observer); wakeObserver = nil }
     }
     private func changeMode() {
@@ -151,7 +164,10 @@ import CodexEyesCore
         guard !busy else { return }
         guard let backend else { message = L("尚未找到内置账号工具，请使用打包脚本构建 App。"); return }
         let ticket = generation; busy = true
+        quotaRetryTask?.cancel(); quotaRetryTask = nil
         defer { if ticket == generation { busy = false } }
+        var retryQuota = false
+        var rateLimited = false
         do {
             let loginStamp = configuredLoginStamp()
             var list = try await backend.list(remote: true)
@@ -168,15 +184,29 @@ import CodexEyesCore
             apply(list); synchronizedLoginStamp = loginStamp; lastCheck = now; message = nil
             try persist(list)
             checkAccountNotifications()
+            retryQuota = list.accounts.contains { QuotaRefreshRecovery.shouldRetry($0.usage?.refresh) }
+            rateLimited = list.accounts.contains { $0.usage?.refresh?.httpStatus == 429 }
         } catch {
             guard ticket == generation else { return }
             // A failed group refresh invalidates green status, while retaining displayed cached values.
             for i in accounts.indices { accounts[i].usage?.refresh = .init(status: "error") }
             try? persist(AccountList(activeAccountKey: identity.configuredAccountID, accounts: accounts))
             message = error.localizedDescription
+            retryQuota = true
         }
+        quotaFailures = retryQuota ? quotaFailures + 1 : 0
+        let retryDelay = retryQuota ? QuotaRefreshRecovery.delay(afterFailures: quotaFailures, rateLimited: rateLimited) : nil
         guard ticket == generation else { return }
         await refreshActivities(ticket: ticket)
+        if ticket == generation, let retryDelay {
+            quotaRetryTask = Task { [weak self] in
+                do { try await Task.sleep(nanoseconds: UInt64(retryDelay * 1_000_000_000)) }
+                catch { return }
+                guard let self, ticket == self.generation else { return }
+                self.quotaRetryTask = nil
+                await self.refresh()
+            }
+        }
     }
     private func refreshActivities(ticket: Int) async {
         if activityBackend == nil {
