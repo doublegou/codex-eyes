@@ -178,7 +178,7 @@ import CodexEyesCore
                 if account.usage?.refresh?.status == "ok", account.usage?.refresh?.method == "api" {
                     list.accounts[i].lastConfirmedAt = now
                 } else {
-                    list.accounts[i].lastConfirmedAt = accounts.first { $0.id == account.id }?.lastConfirmedAt
+                    list.accounts[i] = account.retainingQuota(from: accounts.first { $0.id == account.id })
                 }
             }
             apply(list); synchronizedLoginStamp = loginStamp; lastCheck = now; message = nil
@@ -191,7 +191,8 @@ import CodexEyesCore
             // A failed group refresh invalidates green status, while retaining displayed cached values.
             for i in accounts.indices { accounts[i].usage?.refresh = .init(status: "error") }
             try? persist(AccountList(activeAccountKey: identity.configuredAccountID, accounts: accounts))
-            message = error.localizedDescription
+            message = accounts.contains { !($0.usage?.displayWindows.isEmpty ?? true) }
+                ? L("暂未更新，显示上次数据") : error.localizedDescription
             retryQuota = true
         }
         quotaFailures = retryQuota ? quotaFailures + 1 : 0

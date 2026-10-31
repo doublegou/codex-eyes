@@ -290,3 +290,6 @@
 "切换为柱状图" = "Switch to bar chart";
 "切换为热力图" = "Switch to heatmap";
 "本机活动 · 全部记录" = "Activity on this Mac · all records";
+
+"上次数据" = "Last known data";
+"暂未更新，显示上次数据" = "Could not refresh. Showing last known data.";

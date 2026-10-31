@@ -7,11 +7,8 @@ public enum MenuBarQuota {
     }
 
     public static func title(for account: Account?, now: Date = Date()) -> String {
-        guard let account, let window = window(for: account) else { return "—" }
-        switch account.availability(at: now) {
-        case .available, .limited: return "\(Int(window.remaining.rounded()))%"
-        default: return "—"
-        }
+        guard let window = window(for: account) else { return "—" }
+        return "\(Int(window.remaining.rounded()))%"
     }
 
     public static func summary(for account: Account?, now: Date = Date()) -> String {
@@ -19,6 +16,10 @@ public enum MenuBarQuota {
         guard title(for: account, now: now) != "—", let window = window(for: account) else {
             return account.availability(at: now).text
         }
-        return L("\(window.localizedLabel)剩余 \(title(for: account, now: now))")
+        let quota = L("\(window.localizedLabel)剩余 \(title(for: account, now: now))")
+        switch account.availability(at: now) {
+        case .available, .limited: return quota
+        default: return quota + " · " + L("上次数据") + " · " + account.availabilitySummary(at: now)
+        }
     }
 }

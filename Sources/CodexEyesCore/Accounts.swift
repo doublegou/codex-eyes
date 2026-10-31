@@ -77,6 +77,22 @@ public struct Account: Codable, Equatable, Identifiable, Sendable {
         self.usage = usage; self.lastConfirmedAt = lastConfirmedAt
         self.profileName = profileName
     }
+    /// Keep the last successful snapshot on failed reads; never borrow another account's quota.
+    public func retainingQuota(from previous: Account?) -> Account {
+        guard let previous, previous.id == id else { return self }
+        var result = self
+        let success = usage?.refresh?.status == "ok" && usage?.refresh?.method == "api"
+        guard !success else { return result }
+        result.lastConfirmedAt = previous.lastConfirmedAt
+        let windows = usage?.displayWindows ?? []
+        if let cached = previous.usage, !cached.displayWindows.isEmpty,
+           windows.isEmpty || (cached.updatedAt ?? 0) >= (usage?.updatedAt ?? 0) {
+            let refresh = usage?.refresh ?? RefreshResult(status: "error")
+            result.usage = cached
+            result.usage?.refresh = refresh
+        }
+        return result
+    }
     public var displayName: String { profileName ?? alias ?? email ?? accountName ?? "Codex" }
     public var recoveryDate: Date? {
         let blocked = [usage?.primary, usage?.secondary].compactMap { $0 }.filter { $0.remaining <= 0 }
@@ -92,7 +108,6 @@ public struct Account: Codable, Equatable, Identifiable, Sendable {
         case .loginRequired: return L("需登录")
         case .unknown:
             if usage?.primary == nil && usage?.secondary == nil { return L("暂无额度") }
-            if let status = usage?.refresh?.status, !["ok", "not_requested"].contains(status) { return L("连接失败") }
             return L("待更新")
         }
     }

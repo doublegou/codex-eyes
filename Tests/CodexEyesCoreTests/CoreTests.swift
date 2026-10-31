@@ -420,10 +420,17 @@ final class CoreTests: XCTestCase {
         current.usage?.secondary = primary
         XCTAssertEqual(MenuBarQuota.title(for: current, now: now), "0%")
     }
-    func testMenuBarDoesNotShowStaleOrFailedQuotaAsCurrent() {
+    func testMenuBarKeepsCachedQuotaAndLabelsItsFreshness() {
         let now = Date(); var current = account(now: now)
-        XCTAssertEqual(MenuBarQuota.title(for: current, now: now.addingTimeInterval(601)), "—")
+        XCTAssertEqual(MenuBarQuota.title(for: current, now: now.addingTimeInterval(601)), "50%")
+        XCTAssertTrue(MenuBarQuota.summary(for: current, now: now.addingTimeInterval(601)).contains("上次数据"))
+        current.usage?.refresh = .init(status: "error")
+        XCTAssertEqual(current.availabilitySummary(at: now), "待更新")
+        XCTAssertEqual(MenuBarQuota.title(for: current, now: now), "50%")
         current.usage?.refresh = .init(status: "http_error", httpStatus: 401)
+        XCTAssertEqual(MenuBarQuota.title(for: current, now: now), "50%")
+        XCTAssertTrue(MenuBarQuota.summary(for: current, now: now).contains("需登录"))
+        current.usage = nil
         XCTAssertEqual(MenuBarQuota.title(for: current, now: now), "—")
         XCTAssertEqual(MenuBarQuota.title(for: nil, now: now), "—")
     }
